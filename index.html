@@ -154,8 +154,9 @@
           </div>
         </div>
         <div style="margin-top:.6rem; display:flex; align-items:center; gap:.4rem;">
-          <label style="margin:0;"><input type="checkbox" id="autoNormalize" checked aria-label="Normalizza automaticamente" />Normalizza automaticamente</label>
+          <label style="margin:0;"><input type="checkbox" id="autoNormalize" aria-label="Normalizza automaticamente" />Normalizza automaticamente</label>
         </div>
+        <p class="small" style="margin:.45rem 0 0;">Suggerimento: lascia questa opzione disattiva mentre inserisci i valori uno alla volta; attivala solo a fine inserimento per riallineare a 100%.</p>
       </div>
 
       <div class="card">
@@ -199,7 +200,7 @@
     const state = {
       system: 'italia',
       totalSeats: 400,
-      autoNormalize: true,
+      autoNormalize: false,
       parties: [
         { id: crypto.randomUUID(), name: 'Partito Alfa', short: 'ALF', color: '#3b82f6', vote: 34 },
         { id: crypto.randomUUID(), name: 'Partito Beta', short: 'BET', color: '#ef4444', vote: 28 },
@@ -234,12 +235,40 @@
 
     let pieChart, barChart;
 
-    function normalizeVotes() {
-      const sum = state.parties.reduce((a,p) => a + Number(p.vote || 0), 0);
-      if (!sum || !state.autoNormalize) return;
-      state.parties.forEach(p => p.vote = +(p.vote * 100 / sum).toFixed(2));
-      const fix = +(100 - state.parties.reduce((a,p) => a + p.vote, 0)).toFixed(2);
-      if (state.parties.length) state.parties[0].vote = +(state.parties[0].vote + fix).toFixed(2);
+    function normalizeVotes(lockedPartyId = null) {
+      if (!state.autoNormalize || !state.parties.length) return;
+
+      if (lockedPartyId) {
+        const locked = state.parties.find(p => p.id === lockedPartyId);
+        if (!locked) return;
+        locked.vote = Math.max(0, Math.min(100, Number(locked.vote || 0)));
+
+        const others = state.parties.filter(p => p.id !== lockedPartyId);
+        const othersSum = others.reduce((a,p) => a + Number(p.vote || 0), 0);
+        const remaining = Math.max(0, 100 - locked.vote);
+
+        if (others.length === 0) {
+          locked.vote = 100;
+          return;
+        }
+
+        if (othersSum <= 0) {
+          const equal = +(remaining / others.length).toFixed(2);
+          others.forEach(p => p.vote = equal);
+        } else {
+          others.forEach(p => p.vote = +((Number(p.vote || 0) / othersSum) * remaining).toFixed(2));
+        }
+      } else {
+        const sum = state.parties.reduce((a,p) => a + Number(p.vote || 0), 0);
+        if (!sum) return;
+        state.parties.forEach(p => p.vote = +((Number(p.vote || 0) * 100) / sum).toFixed(2));
+      }
+
+      const fix = +(100 - state.parties.reduce((a,p) => a + Number(p.vote || 0), 0)).toFixed(2);
+      if (Math.abs(fix) > 0 && state.parties.length) {
+        const target = lockedPartyId ? (state.parties.find(p => p.id !== lockedPartyId) || state.parties[0]) : state.parties[0];
+        target.vote = +(Number(target.vote || 0) + fix).toFixed(2);
+      }
     }
 
     function validateInputs() {
@@ -424,13 +453,15 @@
         els.partyList.appendChild(row);
       });
 
-      els.partyList.querySelectorAll('input').forEach(inp => inp.addEventListener('input', e => {
-        const p = state.parties.find(x => x.id === e.target.dataset.id);
-        const k = e.target.dataset.k;
-        p[k] = k === 'vote' ? Number(e.target.value) : e.target.value;
-        if (state.autoNormalize && k === 'vote') normalizeVotes();
-        refresh();
-      }));
+      els.partyList.querySelectorAll('input').forEach(inp => {
+        const evt = inp.dataset.k === 'vote' ? 'change' : 'input';
+        inp.addEventListener(evt, e => {
+          const p = state.parties.find(x => x.id === e.target.dataset.id);
+          const k = e.target.dataset.k;
+          p[k] = k === 'vote' ? Number(e.target.value) : e.target.value;
+          refresh();
+        });
+      });
       els.partyList.querySelectorAll('[data-remove]').forEach(btn => btn.addEventListener('click', e => {
         state.parties = state.parties.filter(p => p.id !== e.target.dataset.remove);
         refresh();
@@ -480,9 +511,10 @@
           </div>
           <label style="margin-top:.4rem;"><input id="frModel" type="checkbox" ${s.useTransferModel?'checked':''}/>Usa modello semplice di trasferimento voti (semplificazione)</label>
           <label>% primo turno (una riga per collegio)</label>
-          <textarea id="frFirst" rows="4">${s.firstRoundText}</textarea>
-          <label>% secondo turno opzionale (se vuoto, usa modello)</label>
-          <textarea id="frSecond" rows="4">${s.secondRoundText}</textarea>`;
+          <textarea id="frFirst" rows="4" placeholder="Esempio: 30,32,14,12,12">${s.firstRoundText}</textarea>
+          <label>Risultati del doppio turno (spazio dedicato, una riga per collegio)</label>
+          <textarea id="frSecond" rows="5" placeholder="Esempio: 48,52,0,0,0">${s.secondRoundText}</textarea>
+          <p class="small">Se compili questo campo, i risultati del secondo turno prevalgono sul modello di trasferimento semplificato.</p>`;
       }
       if (state.system === 'germania') {
         const s = state.settings.germania;
@@ -589,7 +621,6 @@
       state.system = els.systemSelect.value;
       state.totalSeats = Number(els.totalSeats.value || 0);
       state.autoNormalize = els.autoNormalize.checked;
-      if (state.autoNormalize) normalizeVotes();
 
       renderPartyList();
       renderSystemInputs();
@@ -661,7 +692,11 @@
     };
     els.systemSelect.onchange = refresh;
     els.totalSeats.oninput = refresh;
-    els.autoNormalize.onchange = refresh;
+    els.autoNormalize.onchange = () => {
+      state.autoNormalize = els.autoNormalize.checked;
+      if (state.autoNormalize) normalizeVotes();
+      refresh();
+    };
     els.demoBtn.onclick = loadDemo;
     els.exportBtn.onclick = exportScenario;
     els.importBtn.onclick = () => els.importFile.click();
