@@ -1,0 +1,772 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Simulatore Elettorale Comparato</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --panel-2: #1f2937;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --accent: #22c55e;
+      --danger: #f43f5e;
+      --warning: #f59e0b;
+      --focus: #60a5fa;
+      --border: #334155;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: linear-gradient(180deg, #020617, #0f172a);
+      color: var(--text);
+    }
+    .app {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 1rem;
+      min-height: 100vh;
+      padding: 1rem;
+    }
+    @media (max-width: 1100px) {
+      .app { grid-template-columns: 1fr; }
+    }
+    .card {
+      background: rgba(17,24,39,.92);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1rem;
+      box-shadow: 0 10px 25px rgba(0,0,0,.2);
+    }
+    h1, h2, h3 { margin: .2rem 0 .8rem; line-height: 1.25; }
+    h1 { font-size: 1.4rem; }
+    h2 { font-size: 1rem; color: #cbd5e1; }
+    .muted { color: var(--muted); font-size: .9rem; }
+    .sidebar { display: flex; flex-direction: column; gap: .8rem; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: .6rem; }
+    label { display: block; font-size: .85rem; color: #cbd5e1; margin-bottom: .2rem; }
+    input, select, button, textarea {
+      width: 100%;
+      background: var(--panel-2);
+      color: var(--text);
+      border: 1px solid #475569;
+      border-radius: 10px;
+      padding: .55rem .65rem;
+      font-size: .93rem;
+    }
+    input[type="color"] { padding: .2rem; height: 2.3rem; }
+    input[type="checkbox"] { width: auto; transform: scale(1.15); margin-right: .4rem; }
+    button {
+      cursor: pointer;
+      border-color: #4b5563;
+      transition: .2s ease;
+    }
+    button:hover { filter: brightness(1.08); }
+    button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+      outline: 2px solid var(--focus);
+      outline-offset: 2px;
+    }
+    .btn-row { display: flex; gap: .55rem; flex-wrap: wrap; }
+    .btn-primary { background: #065f46; }
+    .btn-secondary { background: #1e3a8a; }
+    .btn-danger { background: #7f1d1d; }
+    .party-row {
+      border: 1px solid #374151;
+      border-radius: 10px;
+      padding: .6rem;
+      margin-bottom: .5rem;
+      background: #0b1220;
+    }
+    .main { display: grid; gap: .8rem; align-content: start; }
+    .visual-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(280px, 1fr));
+      gap: .8rem;
+    }
+    @media (max-width: 1280px) {
+      .visual-grid { grid-template-columns: 1fr; }
+    }
+    .panel-warning {
+      border: 1px solid #f59e0b;
+      background: rgba(245,158,11,.1);
+      color: #fde68a;
+      padding: .8rem;
+      border-radius: 10px;
+    }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .4rem;
+      margin-top: .6rem;
+    }
+    .legend-item {
+      border: 1px solid #4b5563;
+      border-radius: 999px;
+      padding: .28rem .6rem;
+      font-size: .8rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
+    }
+    .dot { width: .75rem; height: .75rem; border-radius: 99px; display: inline-block; }
+    .selected {
+      box-shadow: 0 0 0 2px var(--focus) inset;
+      border-color: var(--focus) !important;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    th, td { border-bottom: 1px solid #334155; padding: .5rem; text-align: left; }
+    tr:hover { background: rgba(148,163,184,.08); cursor: pointer; }
+    .detail {
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: .8rem;
+      background: #0b1220;
+    }
+    .small { font-size: .8rem; color: #cbd5e1; }
+    .hidden { display: none !important; }
+    .badge { font-size: .75rem; background: #1e293b; border: 1px solid #475569; border-radius: 8px; padding: .12rem .4rem; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="card">
+        <h1>Simulatore elettorale comparato</h1>
+        <p class="muted">Confronto didattico: Italia (Rosatellum), Regno Unito (FPTP), Francia (doppio turno), Germania (misto compensatorio).</p>
+        <div class="grid-2">
+          <div>
+            <label for="systemSelect">Sistema elettorale</label>
+            <select id="systemSelect" aria-label="Seleziona sistema elettorale">
+              <option value="italia">Italia - Rosatellum</option>
+              <option value="uk">Regno Unito - FPTP</option>
+              <option value="francia">Francia - Doppio turno</option>
+              <option value="germania">Germania - Misto compensatorio</option>
+            </select>
+          </div>
+          <div>
+            <label for="totalSeats">Totale seggi</label>
+            <input id="totalSeats" type="number" min="1" value="400" aria-label="Totale seggi" />
+          </div>
+        </div>
+        <div style="margin-top:.6rem; display:flex; align-items:center; gap:.4rem;">
+          <label style="margin:0;"><input type="checkbox" id="autoNormalize" checked aria-label="Normalizza automaticamente" />Normalizza automaticamente</label>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Partiti</h2>
+        <div id="partyList"></div>
+        <button id="addPartyBtn" class="btn-secondary" aria-label="Aggiungi partito">+ Aggiungi partito</button>
+      </div>
+
+      <div class="card" id="systemInputs"></div>
+
+      <div class="card">
+        <div class="btn-row">
+          <button id="demoBtn" class="btn-primary" aria-label="Carica esempio rapido">Esempio rapido</button>
+          <button id="exportBtn" aria-label="Esporta scenario">Esporta scenario</button>
+          <button id="importBtn" aria-label="Importa scenario">Importa scenario</button>
+        </div>
+        <input id="importFile" type="file" accept="application/json" class="hidden" />
+      </div>
+    </aside>
+
+    <main class="main">
+      <div id="warningPanel" class="panel-warning hidden" role="alert"></div>
+
+      <section id="visuals" class="visual-grid hidden">
+        <div class="card">
+          <h2>Seggi per partito (torta)</h2>
+          <canvas id="pieChart" aria-label="Grafico a torta seggi"></canvas>
+          <div id="legend" class="legend"></div>
+        </div>
+
+        <div class="card">
+          <h2>Confronto % voti vs % seggi</h2>
+          <canvas id="barChart" aria-label="Grafico a barre voti e seggi"></canvas>
+        </div>
+
+        <div class="card">
+          <h2>Emiciclo</h2>
+          <svg id="hemicycle" width="100%" viewBox="0 0 760 420" aria-label="Emiciclo dei seggi"></svg>
+          <p id="germanyNote" class="small hidden">Nota Germania: in un sistema compensatorio, alcuni collegi vinti possono non tradursi in mandato nel cap seggi impostato (semplificazione didattica).</p>
+        </div>
+
+        <div class="card">
+          <h2>Tabella risultati <span id="indexBadge" class="badge"></span></h2>
+          <div style="overflow:auto;">
+            <table>
+              <thead>
+                <tr><th>Partito</th><th>Voti %</th><th>Seggi</th><th>Uni.</th><th>Prop.</th><th>Scarto p.p.</th></tr>
+              </thead>
+              <tbody id="resultBody"></tbody>
+            </table>
+          </div>
+          <div id="partyDetail" class="detail" style="margin-top:.7rem;">Seleziona un partito per visualizzare i dettagli.</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const state = {
+      system: 'italia',
+      totalSeats: 400,
+      autoNormalize: true,
+      parties: [
+        { id: crypto.randomUUID(), name: 'Partito Alfa', short: 'ALF', color: '#3b82f6', vote: 34 },
+        { id: crypto.randomUUID(), name: 'Partito Beta', short: 'BET', color: '#ef4444', vote: 28 },
+        { id: crypto.randomUUID(), name: 'Partito Gamma', short: 'GAM', color: '#22c55e', vote: 20 },
+        { id: crypto.randomUUID(), name: 'Partito Delta', short: 'DEL', color: '#eab308', vote: 18 }
+      ],
+      selectedPartyId: null,
+      result: null,
+      settings: {
+        italia: { majorShare: 3/8, method: 'dhondt', threshold: 3, majoritarianManual: {} },
+        uk: { mode: 'manual', manualSeats: {}, districtsText: '' },
+        francia: { districts: 20, threshold2nd: 12.5, useTransferModel: true, firstRoundText: '', secondRoundText: '', transferMatrix: 0.65 },
+        germania: { capSeats: 598, districtsWon: {} }
+      }
+    };
+
+    const els = {
+      partyList: document.getElementById('partyList'),
+      addPartyBtn: document.getElementById('addPartyBtn'),
+      systemInputs: document.getElementById('systemInputs'),
+      systemSelect: document.getElementById('systemSelect'),
+      totalSeats: document.getElementById('totalSeats'),
+      autoNormalize: document.getElementById('autoNormalize'),
+      warningPanel: document.getElementById('warningPanel'),
+      visuals: document.getElementById('visuals'),
+      resultBody: document.getElementById('resultBody'),
+      partyDetail: document.getElementById('partyDetail'),
+      legend: document.getElementById('legend'),
+      demoBtn: document.getElementById('demoBtn'),
+      exportBtn: document.getElementById('exportBtn'),
+      importBtn: document.getElementById('importBtn'),
+      importFile: document.getElementById('importFile'),
+      hemicycle: document.getElementById('hemicycle'),
+      germanyNote: document.getElementById('germanyNote'),
+      indexBadge: document.getElementById('indexBadge')
+    };
+
+    let pieChart, barChart;
+
+    function normalizeVotes() {
+      const sum = state.parties.reduce((a,p) => a + Number(p.vote || 0), 0);
+      if (!sum || !state.autoNormalize) return;
+      state.parties.forEach(p => p.vote = +(p.vote * 100 / sum).toFixed(2));
+      const fix = +(100 - state.parties.reduce((a,p) => a + p.vote, 0)).toFixed(2);
+      if (state.parties.length) state.parties[0].vote = +(state.parties[0].vote + fix).toFixed(2);
+    }
+
+    function validateInputs() {
+      const errors = [];
+      if (state.parties.length < 2) errors.push('Inserire almeno due partiti.');
+      const voteSum = state.parties.reduce((a,p) => a + Number(p.vote || 0), 0);
+      if (Math.abs(voteSum - 100) > 0.2) errors.push(`La somma delle percentuali è ${voteSum.toFixed(2)}: deve essere 100.`);
+      if (state.totalSeats <= 0) errors.push('Il totale seggi deve essere maggiore di zero.');
+
+      if (state.system === 'italia') {
+        const uni = state.settings.italia.majoritarianManual;
+        const targetUni = Math.round(state.totalSeats * state.settings.italia.majorShare);
+        const uniSum = state.parties.reduce((a,p)=>a+Number(uni[p.id]||0),0);
+        if (uniSum !== targetUni) errors.push(`Rosatellum: i seggi uninominali (${uniSum}) devono sommare a ${targetUni}.`);
+      }
+
+      if (state.system === 'uk' && state.settings.uk.mode === 'manual') {
+        const sum = state.parties.reduce((a,p)=>a+Number(state.settings.uk.manualSeats[p.id]||0),0);
+        if (sum !== state.totalSeats) errors.push(`FPTP manuale: i seggi inseriti (${sum}) devono sommare a ${state.totalSeats}.`);
+      }
+
+      if (state.system === 'germania') {
+        const cap = Number(state.settings.germania.capSeats||0);
+        if (cap <= 0) errors.push('Germania: il cap seggi deve essere > 0.');
+      }
+      return errors;
+    }
+
+    function allocateProportionalSeats(method, totalSeats, votesPercent, threshold) {
+      const eligible = votesPercent.map((v,i)=>({v, i})).filter(x => x.v >= threshold);
+      const seats = Array(votesPercent.length).fill(0);
+      if (!eligible.length || totalSeats <= 0) return seats;
+
+      if (method === 'hare') {
+        const totalEligibleVotes = eligible.reduce((a,x)=>a+x.v,0);
+        const quota = totalEligibleVotes / totalSeats;
+        const remainders = [];
+        let assigned = 0;
+        eligible.forEach(x => {
+          const raw = x.v / quota;
+          const s = Math.floor(raw);
+          seats[x.i] = s;
+          assigned += s;
+          remainders.push({i: x.i, r: raw - s});
+        });
+        remainders.sort((a,b)=>b.r-a.r);
+        for (let k=0; k<totalSeats-assigned; k++) seats[remainders[k % remainders.length].i]++;
+      } else {
+        const quotients = [];
+        eligible.forEach(x => {
+          for (let d=1; d<=totalSeats; d++) quotients.push({i:x.i, q:x.v/d});
+        });
+        quotients.sort((a,b)=>b.q-a.q);
+        for (let s=0; s<totalSeats; s++) seats[quotients[s].i]++;
+      }
+      return seats;
+    }
+
+    function allocateFPTPFromSyntheticDistricts(districts) {
+      const seats = Array(state.parties.length).fill(0);
+      districts.forEach(d => {
+        let bestI = 0;
+        d.forEach((v,i)=> { if (v > d[bestI]) bestI = i; });
+        seats[bestI]++;
+      });
+      return seats;
+    }
+
+    function mergeSeatComponents(majoritarianSeats, proportionalSeats) {
+      return majoritarianSeats.map((m,i)=>m + (proportionalSeats[i] || 0));
+    }
+
+    function computeDisproportionalityIndex(votes, seats) {
+      const sumSeats = seats.reduce((a,b)=>a+b,0) || 1;
+      let sq = 0;
+      votes.forEach((v,i) => {
+        const sPerc = (seats[i] / sumSeats) * 100;
+        sq += Math.pow(v - sPerc, 2);
+      });
+      return Math.sqrt(sq / 2); // indice di Gallagher semplificato
+    }
+
+    function computeResults() {
+      const votes = state.parties.map(p => +p.vote);
+      const names = state.parties.map(p => p.short || p.name);
+      const uni = Array(state.parties.length).fill(0);
+      const prop = Array(state.parties.length).fill(0);
+      let seats = Array(state.parties.length).fill(0);
+      let notes = '';
+
+      if (state.system === 'italia') {
+        const uniTarget = Math.round(state.totalSeats * state.settings.italia.majorShare);
+        const propTarget = state.totalSeats - uniTarget;
+        state.parties.forEach((p,i)=> uni[i] = Number(state.settings.italia.majoritarianManual[p.id] || 0));
+        const allocatedProp = allocateProportionalSeats(state.settings.italia.method, propTarget, votes, state.settings.italia.threshold);
+        allocatedProp.forEach((s,i)=> prop[i]=s);
+        seats = mergeSeatComponents(uni, prop);
+      }
+
+      if (state.system === 'uk') {
+        if (state.settings.uk.mode === 'manual') {
+          state.parties.forEach((p,i)=> uni[i] = Number(state.settings.uk.manualSeats[p.id] || 0));
+          seats = [...uni];
+        } else {
+          const lines = state.settings.uk.districtsText.split('\n').map(r=>r.trim()).filter(Boolean);
+          const districts = lines.map(line => line.split(',').map(x=>Number(x.trim()) || 0));
+          seats = allocateFPTPFromSyntheticDistricts(districts);
+          seats.forEach((s,i)=>uni[i]=s);
+          if (districts.length !== state.totalSeats) notes = 'In modalità sintetica UK il numero di collegi dovrebbe coincidere con il totale seggi.';
+        }
+      }
+
+      if (state.system === 'francia') {
+        const districts = Number(state.settings.francia.districts || 0);
+        const t = Number(state.settings.francia.threshold2nd || 12.5);
+        const model = !!state.settings.francia.useTransferModel;
+        const transfer = Number(state.settings.francia.transferMatrix || 0.65);
+        const firstLines = state.settings.francia.firstRoundText.split('\n').map(s=>s.trim()).filter(Boolean);
+        const secondLines = state.settings.francia.secondRoundText.split('\n').map(s=>s.trim()).filter(Boolean);
+        const parseLine = l => l.split(',').map(x=>Number(x.trim())||0);
+
+        for (let d=0; d<districts; d++) {
+          const first = parseLine(firstLines[d] || '');
+          const rank = [...first.keys()].sort((a,b)=>(first[b]||0) - (first[a]||0));
+          const qualified = rank.filter(i => (first[i]||0) >= t);
+          const finalists = [...new Set([rank[0], rank[1], ...qualified])].slice(0,3);
+
+          let round2;
+          if (secondLines[d]) {
+            round2 = parseLine(secondLines[d]);
+          } else {
+            round2 = Array(state.parties.length).fill(0);
+            const top2 = finalists.slice(0,2);
+            top2.forEach(i => round2[i] += first[i] || 0);
+            state.parties.forEach((_,i)=> {
+              if (!top2.includes(i)) {
+                round2[top2[0]] += (first[i]||0) * transfer;
+                round2[top2[1]] += (first[i]||0) * (1-transfer);
+              }
+            });
+          }
+          let winner = 0;
+          round2.forEach((v,i)=>{ if (v > round2[winner]) winner = i; });
+          uni[winner]++;
+        }
+        seats = [...uni];
+        notes = model ? 'Francia: se mancano dati di secondo turno, è usato un modello semplificato di trasferimento voti.' : '';
+      }
+
+      if (state.system === 'germania') {
+        const cap = Number(state.settings.germania.capSeats);
+        const proportional = allocateProportionalSeats('hare', cap, votes, 5);
+        const districtWins = state.parties.map(p => Number(state.settings.germania.districtsWon[p.id] || 0));
+        seats = proportional.map((s,i)=>Math.min(s, districtWins[i]) + Math.max(s - districtWins[i],0));
+        districtWins.forEach((w,i)=>uni[i]=w);
+        proportional.forEach((s,i)=>prop[i]=s);
+        const dropped = districtWins.reduce((acc,w,i)=>acc + Math.max(0,w - proportional[i]),0);
+        notes = dropped > 0 ? `Germania: ${dropped} collegi vinti eccedono il riparto proporzionale nel cap impostato.` : '';
+      }
+
+      const idx = computeDisproportionalityIndex(votes, seats);
+      return { names, votes, seats, uni, prop, index: idx, notes };
+    }
+
+    function renderPartyList() {
+      els.partyList.innerHTML = '';
+      state.parties.forEach((p,idx) => {
+        const row = document.createElement('div');
+        row.className = 'party-row';
+        row.innerHTML = `
+          <div class="grid-2">
+            <div><label>Nome</label><input aria-label="Nome partito" value="${p.name}" data-k="name" data-id="${p.id}"></div>
+            <div><label>Abbreviazione</label><input aria-label="Abbreviazione partito" value="${p.short}" data-k="short" data-id="${p.id}"></div>
+          </div>
+          <div class="grid-3" style="margin-top:.4rem;">
+            <div><label>Colore</label><input aria-label="Colore partito" type="color" value="${p.color}" data-k="color" data-id="${p.id}"></div>
+            <div><label>% voti nazionali</label><input aria-label="Percentuale voti" type="number" min="0" max="100" step="0.01" value="${p.vote}" data-k="vote" data-id="${p.id}"></div>
+            <div style="align-self:end;">
+              <button class="btn-danger" data-remove="${p.id}" ${state.parties.length<=2?'disabled':''}>Rimuovi</button>
+            </div>
+          </div>`;
+        els.partyList.appendChild(row);
+      });
+
+      els.partyList.querySelectorAll('input').forEach(inp => inp.addEventListener('input', e => {
+        const p = state.parties.find(x => x.id === e.target.dataset.id);
+        const k = e.target.dataset.k;
+        p[k] = k === 'vote' ? Number(e.target.value) : e.target.value;
+        if (state.autoNormalize && k === 'vote') normalizeVotes();
+        refresh();
+      }));
+      els.partyList.querySelectorAll('[data-remove]').forEach(btn => btn.addEventListener('click', e => {
+        state.parties = state.parties.filter(p => p.id !== e.target.dataset.remove);
+        refresh();
+      }));
+    }
+
+    function partyValueInputs(getterKey, targetObj, label) {
+      return state.parties.map(p => `<div><label>${label} ${p.short}</label><input type="number" min="0" value="${targetObj[p.id]||0}" data-seatkey="${getterKey}" data-id="${p.id}" /></div>`).join('');
+    }
+
+    function renderSystemInputs() {
+      let html = '';
+      if (state.system === 'italia') {
+        const s = state.settings.italia;
+        html = `
+          <h2>Impostazioni Rosatellum</h2>
+          <div class="grid-2">
+            <div><label>Quota uninominale</label><input id="itMajorShare" type="number" step="0.01" min="0" max="1" value="${s.majorShare.toFixed(3)}" /></div>
+            <div><label>Quota proporzionale</label><input disabled value="${(1-s.majorShare).toFixed(3)}" /></div>
+            <div><label>Soglia %</label><input id="itThreshold" type="number" step="0.1" min="0" value="${s.threshold}" /></div>
+            <div><label>Metodo riparto</label><select id="itMethod"><option value="dhondt" ${s.method==='dhondt'?'selected':''}>D'Hondt</option><option value="hare" ${s.method==='hare'?'selected':''}>Hare-Niemeyer</option></select></div>
+          </div>
+          <h3>Seggi uninominali per partito</h3>
+          <div class="grid-2">${partyValueInputs('itMajor','majoritarianManual','Seggi')}</div>`;
+      }
+      if (state.system === 'uk') {
+        const s = state.settings.uk;
+        html = `
+          <h2>Impostazioni Regno Unito (FPTP)</h2>
+          <div class="grid-2">
+            <div><label>Modalità</label><select id="ukMode"><option value="manual" ${s.mode==='manual'?'selected':''}>A) Seggi manuali</option><option value="synthetic" ${s.mode==='synthetic'?'selected':''}>B) Collegi sintetici</option></select></div>
+          </div>
+          ${s.mode==='manual' ? `<div class="grid-2" style="margin-top:.4rem;">${partyValueInputs('ukManual','manualSeats','Seggi')}</div>` : `
+            <label style="margin-top:.4rem;">Collegi sintetici (una riga per collegio, valori separati da virgola nell'ordine dei partiti)</label>
+            <textarea id="ukDistricts" rows="6" aria-label="Collegi sintetici UK">${s.districtsText}</textarea>
+            <p class="small">Esempio riga con 4 partiti: <code>40,30,20,10</code>.</p>
+          `}`;
+      }
+      if (state.system === 'francia') {
+        const s = state.settings.francia;
+        html = `
+          <h2>Impostazioni Francia</h2>
+          <div class="grid-3">
+            <div><label>N. collegi</label><input id="frDistricts" type="number" min="1" value="${s.districts}" /></div>
+            <div><label>Soglia accesso 2° turno %</label><input id="frThreshold" type="number" min="0" value="${s.threshold2nd}" /></div>
+            <div><label>Quota trasferimento al 1° classificato</label><input id="frTransfer" type="number" min="0" max="1" step="0.05" value="${s.transferMatrix}" /></div>
+          </div>
+          <label style="margin-top:.4rem;"><input id="frModel" type="checkbox" ${s.useTransferModel?'checked':''}/>Usa modello semplice di trasferimento voti (semplificazione)</label>
+          <label>% primo turno (una riga per collegio)</label>
+          <textarea id="frFirst" rows="4">${s.firstRoundText}</textarea>
+          <label>% secondo turno opzionale (se vuoto, usa modello)</label>
+          <textarea id="frSecond" rows="4">${s.secondRoundText}</textarea>`;
+      }
+      if (state.system === 'germania') {
+        const s = state.settings.germania;
+        html = `
+          <h2>Impostazioni Germania</h2>
+          <div class="grid-2">
+            <div><label>Cap seggi complessivo</label><input id="deCap" type="number" min="1" value="${s.capSeats}" /></div>
+            <div><label>Soglia nazionale liste</label><input disabled value="5% (fissa, didattica)" /></div>
+          </div>
+          <h3>Collegi vinti (Erststimme)</h3>
+          <div class="grid-2">${partyValueInputs('deDistrict','districtsWon','Collegi')}</div>`;
+      }
+
+      els.systemInputs.innerHTML = html;
+
+      if (state.system === 'italia') {
+        document.getElementById('itMajorShare').oninput = e => { state.settings.italia.majorShare = Number(e.target.value); refresh(); };
+        document.getElementById('itThreshold').oninput = e => { state.settings.italia.threshold = Number(e.target.value); refresh(); };
+        document.getElementById('itMethod').onchange = e => { state.settings.italia.method = e.target.value; refresh(); };
+      }
+      if (state.system === 'uk') {
+        document.getElementById('ukMode').onchange = e => { state.settings.uk.mode = e.target.value; refresh(); };
+        const ta = document.getElementById('ukDistricts');
+        if (ta) ta.oninput = e => { state.settings.uk.districtsText = e.target.value; refresh(); };
+      }
+      if (state.system === 'francia') {
+        document.getElementById('frDistricts').oninput = e => { state.settings.francia.districts = Number(e.target.value); refresh(); };
+        document.getElementById('frThreshold').oninput = e => { state.settings.francia.threshold2nd = Number(e.target.value); refresh(); };
+        document.getElementById('frModel').onchange = e => { state.settings.francia.useTransferModel = e.target.checked; refresh(); };
+        document.getElementById('frFirst').oninput = e => { state.settings.francia.firstRoundText = e.target.value; refresh(); };
+        document.getElementById('frSecond').oninput = e => { state.settings.francia.secondRoundText = e.target.value; refresh(); };
+        document.getElementById('frTransfer').oninput = e => { state.settings.francia.transferMatrix = Number(e.target.value); refresh(); };
+      }
+      if (state.system === 'germania') {
+        document.getElementById('deCap').oninput = e => { state.settings.germania.capSeats = Number(e.target.value); refresh(); };
+      }
+
+      els.systemInputs.querySelectorAll('[data-seatkey]').forEach(inp => inp.addEventListener('input', e => {
+        const id = e.target.dataset.id;
+        const val = Number(e.target.value || 0);
+        const sk = e.target.dataset.seatkey;
+        if (sk === 'itMajor') state.settings.italia.majoritarianManual[id] = val;
+        if (sk === 'ukManual') state.settings.uk.manualSeats[id] = val;
+        if (sk === 'deDistrict') state.settings.germania.districtsWon[id] = val;
+        refresh();
+      }));
+    }
+
+    function drawHemicycle(result) {
+      const svg = els.hemicycle;
+      svg.innerHTML = '';
+      const total = result.seats.reduce((a,b)=>a+b,0);
+      if (!total) return;
+      const cx = 380, cy = 390, rMin = 90, rMax = 330;
+      const rows = 7;
+      const pts = [];
+      for (let row=0; row<rows; row++) {
+        const r = rMin + (rMax-rMin) * row/(rows-1);
+        const n = Math.max(6, Math.round((Math.PI * r) / 22));
+        for (let i=0; i<n; i++) {
+          const t = Math.PI - (Math.PI * i/(n-1));
+          pts.push({x: cx + r*Math.cos(t), y: cy - r*Math.sin(t)});
+        }
+      }
+      pts.sort((a,b)=>a.y-b.y);
+      const seatDots = pts.slice(0,total);
+
+      let cursor = 0;
+      result.seats.forEach((s,pi) => {
+        for (let k=0; k<s; k++) {
+          const d = seatDots[cursor++];
+          if (!d) break;
+          const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+          c.setAttribute('cx', d.x); c.setAttribute('cy', d.y); c.setAttribute('r', 7.3);
+          c.setAttribute('fill', state.parties[pi].color);
+          c.setAttribute('stroke', '#0b1220'); c.setAttribute('stroke-width', '1.6');
+          c.style.opacity = !state.selectedPartyId || state.parties[pi].id === state.selectedPartyId ? '1' : '.28';
+          c.style.cursor = 'pointer';
+          c.addEventListener('click', () => selectParty(state.parties[pi].id));
+          c.appendChild(document.createTitle()).textContent = `${state.parties[pi].name}: ${s} seggi`;
+          svg.appendChild(c);
+        }
+      });
+    }
+
+    function updateDetails(result) {
+      const p = state.parties.find(x => x.id === state.selectedPartyId);
+      if (!p) {
+        els.partyDetail.textContent = 'Seleziona un partito per visualizzare i dettagli.';
+        return;
+      }
+      const i = state.parties.findIndex(x => x.id === p.id);
+      const total = result.seats.reduce((a,b)=>a+b,0) || 1;
+      const seatPerc = (result.seats[i]/total*100).toFixed(2);
+      const gap = (seatPerc - result.votes[i]).toFixed(2);
+      els.partyDetail.innerHTML = `
+        <strong>${p.name} (${p.short})</strong><br>
+        Voti: <b>${result.votes[i].toFixed(2)}%</b> · Seggi: <b>${result.seats[i]}</b> (${seatPerc}%)<br>
+        Scarto voti-seggi: <b>${gap} p.p.</b><br>
+        Componenti: Uninominale <b>${result.uni[i]||0}</b> · Proporzionale <b>${result.prop[i]||0}</b>`;
+    }
+
+    function drawCharts(result) {
+      const labels = state.parties.map(p => p.short);
+      const colors = state.parties.map(p => p.color);
+      const selectedIdx = state.parties.findIndex(p=>p.id===state.selectedPartyId);
+
+      pieChart?.destroy();
+      pieChart = new Chart(document.getElementById('pieChart'), {
+        type: 'pie',
+        data: { labels, datasets: [{ data: result.seats, backgroundColor: colors, borderColor:'#0f172a', borderWidth:2, offset: ctx => ctx.dataIndex===selectedIdx ? 14 : 0 }] },
+        options: {
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `${c.label}: ${c.parsed} seggi` } } },
+          onClick: (_, items) => { if (items[0]) selectParty(state.parties[items[0].index].id); }
+        }
+      });
+
+      barChart?.destroy();
+      barChart = new Chart(document.getElementById('barChart'), {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            { label: '% voti', data: result.votes, backgroundColor: colors.map(c=>c+'99') },
+            { label: '% seggi', data: result.seats.map(s => s / Math.max(1,result.seats.reduce((a,b)=>a+b,0))*100), backgroundColor: colors }
+          ]
+        },
+        options: {
+          scales: { y: { beginAtZero: true, max: 100 } },
+          plugins: { tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.raw.toFixed(2)}%` } } },
+          onClick: (_, items) => { if (items[0]) selectParty(state.parties[items[0].index].id); }
+        }
+      });
+    }
+
+    function renderLegend() {
+      els.legend.innerHTML = '';
+      state.parties.forEach(p => {
+        const el = document.createElement('button');
+        el.className = 'legend-item' + (p.id === state.selectedPartyId ? ' selected' : '');
+        el.innerHTML = `<span class="dot" style="background:${p.color}"></span>${p.short}`;
+        el.onclick = () => selectParty(p.id);
+        els.legend.appendChild(el);
+      });
+    }
+
+    function renderTable(result) {
+      const total = result.seats.reduce((a,b)=>a+b,0) || 1;
+      els.resultBody.innerHTML = '';
+      state.parties.forEach((p,i) => {
+        const seatPerc = result.seats[i]/total*100;
+        const tr = document.createElement('tr');
+        if (p.id === state.selectedPartyId) tr.classList.add('selected');
+        tr.innerHTML = `<td><span class="dot" style="background:${p.color}"></span> ${p.name}</td><td>${result.votes[i].toFixed(2)}</td><td>${result.seats[i]}</td><td>${result.uni[i]||0}</td><td>${result.prop[i]||0}</td><td>${(seatPerc-result.votes[i]).toFixed(2)}</td>`;
+        tr.onclick = () => selectParty(p.id);
+        els.resultBody.appendChild(tr);
+      });
+      els.indexBadge.textContent = `Indice disproporzionalità: ${result.index.toFixed(2)}`;
+    }
+
+    function selectParty(id) {
+      state.selectedPartyId = id;
+      if (state.result) renderAllVisuals(state.result);
+    }
+
+    function renderAllVisuals(result) {
+      drawCharts(result);
+      drawHemicycle(result);
+      renderTable(result);
+      renderLegend();
+      updateDetails(result);
+      els.germanyNote.classList.toggle('hidden', state.system !== 'germania');
+      if (result.notes) {
+        els.partyDetail.innerHTML += `<div class="small" style="margin-top:.4rem;">${result.notes}</div>`;
+      }
+    }
+
+    function refresh() {
+      state.system = els.systemSelect.value;
+      state.totalSeats = Number(els.totalSeats.value || 0);
+      state.autoNormalize = els.autoNormalize.checked;
+      if (state.autoNormalize) normalizeVotes();
+
+      renderPartyList();
+      renderSystemInputs();
+
+      const errors = validateInputs();
+      if (errors.length) {
+        els.visuals.classList.add('hidden');
+        els.warningPanel.classList.remove('hidden');
+        els.warningPanel.innerHTML = `<strong>Controllo dati</strong><br>${errors[0]}`;
+        return;
+      }
+
+      const result = computeResults();
+      state.result = result;
+      els.warningPanel.classList.add('hidden');
+      els.visuals.classList.remove('hidden');
+      renderAllVisuals(result);
+    }
+
+    function loadDemo() {
+      state.parties = [
+        { id: crypto.randomUUID(), name: 'Coalizione Progressista', short: 'PRO', color: '#3b82f6', vote: 31 },
+        { id: crypto.randomUUID(), name: 'Alleanza Conservatrice', short: 'CON', color: '#ef4444', vote: 34 },
+        { id: crypto.randomUUID(), name: 'Verdi e Civici', short: 'VER', color: '#22c55e', vote: 14 },
+        { id: crypto.randomUUID(), name: 'Liberali', short: 'LIB', color: '#f59e0b', vote: 11 },
+        { id: crypto.randomUUID(), name: 'Popolari', short: 'POP', color: '#a855f7', vote: 10 }
+      ];
+      const p = state.parties;
+      state.settings.italia.majoritarianManual = {[p[0].id]:50,[p[1].id]:80,[p[2].id]:10,[p[3].id]:5,[p[4].id]:5};
+      state.settings.uk.manualSeats = {[p[0].id]:170,[p[1].id]:190,[p[2].id]:20,[p[3].id]:12,[p[4].id]:8};
+      state.settings.germania.districtsWon = {[p[0].id]:120,[p[1].id]:160,[p[2].id]:12,[p[3].id]:4,[p[4].id]:3};
+      state.settings.francia.firstRoundText = Array.from({length:20},()=> '30,32,14,12,12').join('\n');
+      state.settings.francia.secondRoundText = '';
+      state.selectedPartyId = p[0].id;
+      refresh();
+    }
+
+    function exportScenario() {
+      const data = JSON.stringify(state, null, 2);
+      const blob = new Blob([data], {type:'application/json'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `scenario-elettorale-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    function importScenario(file) {
+      const r = new FileReader();
+      r.onload = () => {
+        try {
+          const parsed = JSON.parse(r.result);
+          ['system','totalSeats','autoNormalize','parties','settings'].forEach(k => state[k] = parsed[k]);
+          state.selectedPartyId = null;
+          els.systemSelect.value = state.system;
+          els.totalSeats.value = state.totalSeats;
+          els.autoNormalize.checked = state.autoNormalize;
+          refresh();
+        } catch {
+          alert('JSON non valido.');
+        }
+      };
+      r.readAsText(file);
+    }
+
+    els.addPartyBtn.onclick = () => {
+      state.parties.push({ id: crypto.randomUUID(), name: 'Nuovo partito', short: 'NEW', color: '#94a3b8', vote: 0 });
+      refresh();
+    };
+    els.systemSelect.onchange = refresh;
+    els.totalSeats.oninput = refresh;
+    els.autoNormalize.onchange = refresh;
+    els.demoBtn.onclick = loadDemo;
+    els.exportBtn.onclick = exportScenario;
+    els.importBtn.onclick = () => els.importFile.click();
+    els.importFile.onchange = e => e.target.files[0] && importScenario(e.target.files[0]);
+
+    loadDemo();
+  </script>
+</body>
+</html>
