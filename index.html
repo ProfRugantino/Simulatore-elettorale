@@ -130,7 +130,6 @@
     }
     .small { font-size: .8rem; color: #cbd5e1; }
     .hidden { display: none !important; }
-    .badge { font-size: .75rem; background: #1e293b; border: 1px solid #475569; border-radius: 8px; padding: .12rem .4rem; }
   </style>
 </head>
 <body>
@@ -192,24 +191,6 @@
           <canvas id="barChart" aria-label="Grafico a barre voti e seggi"></canvas>
         </div>
 
-        <div class="card">
-          <h2>Emiciclo</h2>
-          <svg id="hemicycle" width="100%" viewBox="0 0 760 420" aria-label="Emiciclo dei seggi"></svg>
-          <p id="germanyNote" class="small hidden">Nota Germania: in un sistema compensatorio, alcuni collegi vinti possono non tradursi in mandato nel cap seggi impostato (semplificazione didattica).</p>
-        </div>
-
-        <div class="card">
-          <h2>Tabella risultati <span id="indexBadge" class="badge"></span></h2>
-          <div style="overflow:auto;">
-            <table>
-              <thead>
-                <tr><th>Partito</th><th>Voti %</th><th>Seggi</th><th>Uni.</th><th>Prop.</th><th>Scarto p.p.</th></tr>
-              </thead>
-              <tbody id="resultBody"></tbody>
-            </table>
-          </div>
-          <div id="partyDetail" class="detail" style="margin-top:.7rem;">Seleziona un partito per visualizzare i dettagli.</div>
-        </div>
       </section>
     </main>
   </div>
@@ -244,16 +225,11 @@
       autoNormalize: document.getElementById('autoNormalize'),
       warningPanel: document.getElementById('warningPanel'),
       visuals: document.getElementById('visuals'),
-      resultBody: document.getElementById('resultBody'),
-      partyDetail: document.getElementById('partyDetail'),
       legend: document.getElementById('legend'),
       demoBtn: document.getElementById('demoBtn'),
       exportBtn: document.getElementById('exportBtn'),
       importBtn: document.getElementById('importBtn'),
       importFile: document.getElementById('importFile'),
-      hemicycle: document.getElementById('hemicycle'),
-      germanyNote: document.getElementById('germanyNote'),
-      indexBadge: document.getElementById('indexBadge')
     };
 
     let pieChart, barChart;
@@ -555,60 +531,6 @@
       }));
     }
 
-    function drawHemicycle(result) {
-      const svg = els.hemicycle;
-      svg.innerHTML = '';
-      const total = result.seats.reduce((a,b)=>a+b,0);
-      if (!total) return;
-      const cx = 380, cy = 390, rMin = 90, rMax = 330;
-      const rows = 7;
-      const pts = [];
-      for (let row=0; row<rows; row++) {
-        const r = rMin + (rMax-rMin) * row/(rows-1);
-        const n = Math.max(6, Math.round((Math.PI * r) / 22));
-        for (let i=0; i<n; i++) {
-          const t = Math.PI - (Math.PI * i/(n-1));
-          pts.push({x: cx + r*Math.cos(t), y: cy - r*Math.sin(t)});
-        }
-      }
-      pts.sort((a,b)=>a.y-b.y);
-      const seatDots = pts.slice(0,total);
-
-      let cursor = 0;
-      result.seats.forEach((s,pi) => {
-        for (let k=0; k<s; k++) {
-          const d = seatDots[cursor++];
-          if (!d) break;
-          const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
-          c.setAttribute('cx', d.x); c.setAttribute('cy', d.y); c.setAttribute('r', 7.3);
-          c.setAttribute('fill', state.parties[pi].color);
-          c.setAttribute('stroke', '#0b1220'); c.setAttribute('stroke-width', '1.6');
-          c.style.opacity = !state.selectedPartyId || state.parties[pi].id === state.selectedPartyId ? '1' : '.28';
-          c.style.cursor = 'pointer';
-          c.addEventListener('click', () => selectParty(state.parties[pi].id));
-          c.appendChild(document.createTitle()).textContent = `${state.parties[pi].name}: ${s} seggi`;
-          svg.appendChild(c);
-        }
-      });
-    }
-
-    function updateDetails(result) {
-      const p = state.parties.find(x => x.id === state.selectedPartyId);
-      if (!p) {
-        els.partyDetail.textContent = 'Seleziona un partito per visualizzare i dettagli.';
-        return;
-      }
-      const i = state.parties.findIndex(x => x.id === p.id);
-      const total = result.seats.reduce((a,b)=>a+b,0) || 1;
-      const seatPerc = (result.seats[i]/total*100).toFixed(2);
-      const gap = (seatPerc - result.votes[i]).toFixed(2);
-      els.partyDetail.innerHTML = `
-        <strong>${p.name} (${p.short})</strong><br>
-        Voti: <b>${result.votes[i].toFixed(2)}%</b> · Seggi: <b>${result.seats[i]}</b> (${seatPerc}%)<br>
-        Scarto voti-seggi: <b>${gap} p.p.</b><br>
-        Componenti: Uninominale <b>${result.uni[i]||0}</b> · Proporzionale <b>${result.prop[i]||0}</b>`;
-    }
-
     function drawCharts(result) {
       const labels = state.parties.map(p => p.short);
       const colors = state.parties.map(p => p.color);
@@ -653,20 +575,6 @@
       });
     }
 
-    function renderTable(result) {
-      const total = result.seats.reduce((a,b)=>a+b,0) || 1;
-      els.resultBody.innerHTML = '';
-      state.parties.forEach((p,i) => {
-        const seatPerc = result.seats[i]/total*100;
-        const tr = document.createElement('tr');
-        if (p.id === state.selectedPartyId) tr.classList.add('selected');
-        tr.innerHTML = `<td><span class="dot" style="background:${p.color}"></span> ${p.name}</td><td>${result.votes[i].toFixed(2)}</td><td>${result.seats[i]}</td><td>${result.uni[i]||0}</td><td>${result.prop[i]||0}</td><td>${(seatPerc-result.votes[i]).toFixed(2)}</td>`;
-        tr.onclick = () => selectParty(p.id);
-        els.resultBody.appendChild(tr);
-      });
-      els.indexBadge.textContent = `Indice disproporzionalità: ${result.index.toFixed(2)}`;
-    }
-
     function selectParty(id) {
       state.selectedPartyId = id;
       if (state.result) renderAllVisuals(state.result);
@@ -674,14 +582,7 @@
 
     function renderAllVisuals(result) {
       drawCharts(result);
-      drawHemicycle(result);
-      renderTable(result);
       renderLegend();
-      updateDetails(result);
-      els.germanyNote.classList.toggle('hidden', state.system !== 'germania');
-      if (result.notes) {
-        els.partyDetail.innerHTML += `<div class="small" style="margin-top:.4rem;">${result.notes}</div>`;
-      }
     }
 
     function refresh() {
@@ -770,3 +671,4 @@
   </script>
 </body>
 </html>
+
